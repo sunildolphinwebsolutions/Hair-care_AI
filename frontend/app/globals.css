@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: 'Inter', sans-serif;
+  --font-outfit: 'Outfit', sans-serif;
+}
+
+body {
+  color: #16221B;
+  background: #DCE3DB;
+  font-family: var(--font-inter);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-outfit);
+}
+
+/* Premium Web App Card Styling */
+.web-card {
+  background-color: #FFFFFF;
+  border: 1px solid rgba(200, 215, 202, 0.7);
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 16px -2px rgba(18, 57, 38, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.web-card-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 32px -8px rgba(18, 57, 38, 0.1), 0 4px 12px -2px rgba(0, 0, 0, 0.03);
+  border-color: rgba(18, 57, 38, 0.3);
+}
+
+/* Glassmorphic accents */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+/* Pulse animation for active badges */
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.03); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s infinite ease-in-out;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #DCE3DB;
+}
+::-webkit-scrollbar-thumb {
+  background: #B4C4B4;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #123926;
+}

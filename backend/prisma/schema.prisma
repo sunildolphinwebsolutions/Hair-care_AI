@@ -1,0 +1,306 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Porosity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum HairTexture {
+  STRAIGHT
+  WAVY
+  CURLY
+  COILY
+}
+
+enum ScalpType {
+  DRY
+  NORMAL
+  OILY
+  SENSITIVE
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  avatar       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile                 UserProfile?
+  intakeResponses         IntakeResponse[]
+  photoSessions           PhotoSession[]
+  assessments             VisualAssessment[]
+  wellnessPlans           WellnessPlan[]
+  progressReports         ProgressReport[]
+  notificationPreferences NotificationPreference?
+  notificationLogs        NotificationLog[]
+  hairProfile             HairProfile?
+  routines                Routine[]
+  logs                    RoutineLog[]
+
+  @@map("users")
+}
+
+model UserProfile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ageRange       String?
+  gender         String?
+  dietHabits     Json?
+  routineHabits  Json?
+  medicalHistory Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("user_profiles")
+}
+
+model IntakeResponse {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version        String   @default("1.0")
+  ageRange       String
+  gender         String
+  concerns       String[]
+  dietHabits     Json?
+  routineHabits  Json?
+  medicalHistory Json?
+  aiObservations Json?
+  status         String   @default("COMPLETED")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+  @@map("intake_responses")
+}
+
+model PhotoSession {
+  id           String            @id @default(uuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status       String            @default("PENDING") // PENDING, COMPLETED, ANALYZED
+  consentGiven Boolean           @default(true)
+  photos       PhotoMetadata[]
+  assessment   VisualAssessment?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([userId])
+  @@map("photo_sessions")
+}
+
+model PhotoMetadata {
+  id           String       @id @default(uuid())
+  sessionId    String
+  session      PhotoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  category     String       // FRONT_HAIRLINE, TOP_SCALP, LEFT_SIDE, RIGHT_SIDE
+  storageKey   String
+  originalName String
+  mimeType     String
+  fileSize     Int
+  isThumbnail  Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+
+  @@index([sessionId])
+  @@map("photo_metadata")
+}
+
+model VisualAssessment {
+  id                  String       @id @default(uuid())
+  sessionId           String       @unique
+  session             PhotoSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId              String
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status              String       @default("COMPLETED") // QUEUED, PROCESSING, COMPLETED, FAILED
+  qualityStatus       String       @default("GOOD") // GOOD, MARGINAL, POOR
+  hairDensity         String       @default("Moderate")
+  scalpHealth         String       @default("Good")
+  hairThickness       String       @default("Slightly Low")
+  signsOfDamage       String       @default("Minimal")
+  overallAssessment   String       @default("Moderate")
+  notableObservations String[]
+  unassessedAreas     String[]
+  limitations         String[]
+  recommendRetake     Boolean      @default(false)
+  modelVersion        String       @default("gemini-1.5-flash")
+  disclaimer          String       @default("This analysis is for informational purposes only and not a medical diagnosis.")
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([userId])
+  @@map("visual_assessments")
+}
+
+model ProgressReport {
+  id                     String   @id @default(uuid())
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate              DateTime
+  endDate                DateTime
+  summary                String
+  photoComparisonDetails Json?    // Differences in lighting, angle, distance
+  userReportedChanges    Json?    // Reduced shedding, improved scalp comfort
+  adherenceRate          Float    @default(85.0)
+  cautiousObservations   String[]
+  disclaimer             String   @default("This progress summary identifies visual photograph differences and does not constitute a clinical medical diagnosis.")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([userId])
+  @@map("progress_reports")
+}
+
+model AnalysisJob {
+  id          String   @id @default(uuid())
+  sessionId   String
+  userId      String
+  status      String   @default("QUEUED") // QUEUED, PROCESSING, COMPLETED, FAILED
+  attempts    Int      @default(0)
+  errorReason String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([sessionId])
+  @@map("analysis_jobs")
+}
+
+model WellnessPlan {
+  id                 String    @id @default(uuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  version            String    @default("1.0")
+  status             String    @default("DRAFT") // DRAFT, ACTIVE, ARCHIVED
+  summary            String
+  nutrients          Json      // [{ name, benefit, category, iconColor }]
+  recommendedFoods   Json      // [{ name, category, benefit }]
+  routineSuggestions Json      // [{ title, frequency, instructions }]
+  lifestyleHabits    Json      // [{ title, recommendation }]
+  userAccepted       Boolean   @default(false)
+  acceptedAt         DateTime?
+  disclaimer         String    @default("This plan provides general wellness and nutrition education, not medical advice.")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("wellness_plans")
+}
+
+model NotificationPreference {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  remindersEnabled Boolean  @default(true)
+  reminderTime     String   @default("09:00") // 24hr format HH:mm
+  timezone         String   @default("UTC")
+  channels         String[] // email, push, in_app
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("notification_preferences")
+}
+
+model NotificationLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  channel   String   @default("in_app")
+  sentAt    DateTime @default(now())
+  isRead    Boolean  @default(false)
+
+  @@index([userId])
+  @@map("notification_logs")
+}
+
+model HairProfile {
+  id          String      @id @default(uuid())
+  userId      String      @unique
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  porosity    Porosity    @default(MEDIUM)
+  texture     HairTexture @default(WAVY)
+  scalpType   ScalpType   @default(NORMAL)
+  density     String?     // Low, Medium, High
+  elasticity  String?     // Low, Medium, High
+  concerns    String[]    // Frizz, Breakage, Hair Loss, Dryness, etc.
+  goals       String[]    // Growth, Volume, Hydration, Scalp Health
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("hair_profiles")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  brand       String
+  category    String   // Shampoo, Conditioner, Leave-in, Oil, Mask, Styling
+  ingredients String[]
+  rating      Float?   @default(0.0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  routineItems RoutineItem[]
+
+  @@map("products")
+}
+
+model Routine {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  frequency   String   // Daily, Weekly, Bi-weekly
+  isAI        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items RoutineItem[]
+  logs  RoutineLog[]
+
+  @@index([userId])
+  @@map("routines")
+}
+
+model RoutineItem {
+  id           String   @id @default(uuid())
+  routineId    String
+  routine      Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  productId    String?
+  product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  stepName     String   // Cleanse, Hydrate, Seal, Style
+  stepOrder    Int
+  instructions String?
+
+  @@index([routineId])
+  @@map("routine_items")
+}
+
+model RoutineLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  routineId   String
+  routine     Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  status      String   @default("COMPLETED") // COMPLETED, SKIPPED, NOT_APPLICABLE
+  completedAt DateTime @default(now())
+  rating      Int?     // 1 to 5 scale
+  notes       String?
+
+  @@index([userId])
+  @@index([routineId])
+  @@map("routine_logs")
+}
