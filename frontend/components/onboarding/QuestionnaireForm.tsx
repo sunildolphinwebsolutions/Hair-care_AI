@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   Save,
   ArrowRight,
+  ArrowLeft,
   Settings,
 } from 'lucide-react';
 
@@ -124,10 +125,11 @@ export const QuestionnaireForm: React.FC = () => {
         });
       }
 
-      setSuccessMessage('Profile and questionnaire updated successfully!');
+      setSuccessMessage('Intake data saved! Preparing your AI analysis...');
       setTimeout(() => {
-        router.push('/dashboard');
-      }, 1200);
+        // Proceed to Step 3/4 (AI Analyzing)
+        router.push('/analyzing');
+      }, 600);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to save questionnaire responses.');
     } finally {
@@ -140,23 +142,47 @@ export const QuestionnaireForm: React.FC = () => {
 
   return (
     <div className="space-y-6 w-full pb-12 text-[#1A2620]">
+      {/* 0. Step Progress Header Bar (Step 2/4) */}
+      <div className="bg-white border border-[#D5E0D5] rounded-2xl px-6 py-3.5 flex items-center justify-between shadow-2xs">
+        <button
+          onClick={() => router.push('/upload-photos')}
+          className="w-8 h-8 rounded-full bg-[#EEF4EE] text-[#123926] flex items-center justify-center hover:bg-[#D2DDD2] transition-colors cursor-pointer"
+          title="Back to Photo Upload"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="w-24 sm:w-32 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-[#123926] w-[50%] rounded-full transition-all duration-300" />
+          </div>
+          <span className="text-xs font-bold text-[#123926] font-mono">Step 2/4</span>
+        </div>
+      </div>
+
       {/* 1. Desktop Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1 pb-1 w-full">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-[#123926] tracking-tight flex items-center gap-2.5">
-            <UserIcon className="w-7 h-7 text-[#123926]" /> My Profile & Intake Questionnaire
+            <UserIcon className="w-7 h-7 text-[#123926]" /> Hair & Scalp Profile Questionnaire
           </h1>
           <p className="text-xs sm:text-sm text-[#55645B] font-semibold mt-1">
-            Manage your personal trichology profile, scalp concerns, and health settings.
+            Provide details about your daily routine, hair concerns, and habits for accurate AI trichology analysis.
           </p>
         </div>
 
         <button
           onClick={handleSubmit}
           disabled={saving}
-          className="px-6 py-2.5 rounded-xl bg-[#123926] text-white text-xs font-bold hover:bg-[#0D2E1E] transition shadow-2xs flex items-center gap-2 self-start sm:self-auto"
+          className="px-6 py-3 rounded-xl bg-[#123926] text-white text-xs sm:text-sm font-extrabold hover:bg-[#0D2E1E] transition shadow-md flex items-center gap-2 cursor-pointer self-start sm:self-auto disabled:opacity-50"
         >
-          <Save className="w-4 h-4" /> {saving ? 'Saving Changes...' : 'Save Profile Settings'}
+          {saving ? (
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <>
+              <span>Continue to AI Analysis</span> <ArrowRight className="w-4 h-4" />
+            </>
+          )}
         </button>
       </div>
 
@@ -261,6 +287,22 @@ export const QuestionnaireForm: React.FC = () => {
               Your scalp photos and questionnaire responses are end-to-end encrypted and evaluated strictly by AI algorithm.
             </p>
           </div>
+
+          {/* Action CTA Button */}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={saving}
+            className="w-full py-3.5 rounded-full bg-[#123926] text-white font-extrabold text-sm hover:bg-[#0D2E1E] transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            {saving ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <span>Continue to AI Analysis</span> <ArrowRight className="w-4.5 h-4.5" />
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

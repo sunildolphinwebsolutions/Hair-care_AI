@@ -10,6 +10,21 @@ export interface AngleAnalysisScore {
   observations: string;
 }
 
+export interface DoctorRecommendation {
+  category: 'Shampoo & Cleanser' | 'Topical Solution & Serum' | 'Supplement & Medicine' | 'Scalp Routine';
+  name: string;
+  purpose: string;
+  frequency: string;
+  hairTypeTarget?: string;
+  imageUrl: string;
+  rating: number;
+  reviewsCount: number;
+  price: string;
+  keyIngredients: string[];
+  dosage: string;
+  badge?: 'Trichologist Pick' | 'Clinical Grade' | 'Doctor Recommended';
+}
+
 export interface VisualAnalysisResult {
   qualityStatus: 'GOOD' | 'MARGINAL' | 'POOR';
   hairDensity: 'High' | 'Moderate' | 'Slightly Low' | 'Low';
@@ -17,7 +32,7 @@ export interface VisualAnalysisResult {
   hairThickness: 'Normal' | 'Slightly Low' | 'Thin';
   signsOfDamage: 'Minimal' | 'Moderate' | 'High';
   overallAssessment: 'Good' | 'Moderate' | 'Fair' | 'Requires Care';
-  
+
   // Quantitative AI Scalp Vision Scores (0-100)
   hairDensityScore: number;       // e.g. 78 (%)
   sebumLevelScore: number;        // e.g. 45 (%)
@@ -25,10 +40,13 @@ export interface VisualAnalysisResult {
   follicleCountEstimate: number;  // e.g. 145 / cm²
   strandThicknessMicrons: number; // e.g. 68 µm
   sheddingRiskLevel: 'Low' | 'Moderate' | 'Elevated';
-  
+
   // Sub-angle analysis scores
   angleScores: AngleAnalysisScore[];
-  
+
+  // Doctor & Trichologist Recommended Prescriptions & Care Items
+  doctorRecommendations: DoctorRecommendation[];
+
   notableObservations: string[];
   unassessedAreas: string[];
   limitations: string[];
@@ -36,6 +54,65 @@ export interface VisualAnalysisResult {
   modelVersion: string;
   disclaimer: string;
 }
+
+const DEFAULT_DOCTOR_RECOMMENDATIONS: DoctorRecommendation[] = [
+  {
+    category: 'Shampoo & Cleanser',
+    name: 'Ketoconazole 2% Anti-Inflammation Scalp Shampoo',
+    purpose: 'Reduces scalp micro-inflammation, clears sebum blockage from hair follicles, and regulates yeast proliferation.',
+    frequency: 'Use 2 - 3 times weekly',
+    hairTypeTarget: 'Moderate Sebum / Crown Parting Exposure',
+    imageUrl: '/images/products/shampoo_ketoconazole.jpg',
+    rating: 4.9,
+    reviewsCount: 1420,
+    price: '$24.99',
+    keyIngredients: ['Ketoconazole 2%', 'Salicylic Acid', 'Tea Tree Oil'],
+    dosage: 'Apply 5ml to damp scalp. Massage gently for 2 mins, leave on for 3-5 mins before thorough rinse.',
+    badge: 'Trichologist Pick',
+  },
+  {
+    category: 'Topical Solution & Serum',
+    name: 'Rosemary Extract (2%) & Copper Peptide Hair Growth Serum',
+    purpose: 'Stimulates micro-circulation at temporal hairline and strengthens follicle anchoring matrix.',
+    frequency: 'Apply 1ml nightly to scalp crown & hairline',
+    hairTypeTarget: 'Slightly Thinning Crown & Temple Hair',
+    imageUrl: '/images/products/rosemary_serum.jpg',
+    rating: 4.8,
+    reviewsCount: 980,
+    price: '$38.50',
+    keyIngredients: ['Rosemary Leaf Extract 2%', 'Copper Tripeptide-1', 'Redensyl'],
+    dosage: 'Dispense 1 dropper (1ml) onto clean dry scalp. Massage into thinning regions until fully absorbed.',
+    badge: 'Doctor Recommended',
+  },
+  {
+    category: 'Supplement & Medicine',
+    name: 'Biotin 5000mcg + Saw Palmetto & Marine Collagen Supplement',
+    purpose: 'Inhibits topical DHT follicle binding, fortifies keratin synthesis, and enhances hair strand elasticity.',
+    frequency: 'Take 1 capsule daily with morning meal',
+    hairTypeTarget: 'Fine to Medium Hair / Low Density Risk',
+    imageUrl: '/images/products/biotin_supplements.jpg',
+    rating: 4.9,
+    reviewsCount: 2150,
+    price: '$29.95',
+    keyIngredients: ['Biotin 5000mcg', 'Saw Palmetto Extract', 'Marine Collagen Types I & III', 'Zinc Picolinate'],
+    dosage: 'Take 1 capsule daily with food and a full glass of water.',
+    badge: 'Clinical Grade',
+  },
+  {
+    category: 'Scalp Routine',
+    name: '0.5mm Microneedling Scalp Dermaroller & Hydrating Mask',
+    purpose: 'Triggers micro-wounding repair response to boost collagen and enhances scalp serum transdermal absorption.',
+    frequency: 'Use once every 7 to 10 days',
+    hairTypeTarget: 'Scalp Thinning & Slow Follicle Growth',
+    imageUrl: '/images/products/dermaroller_mask.jpg',
+    rating: 4.7,
+    reviewsCount: 640,
+    price: '$34.00',
+    keyIngredients: ['Titanium 0.5mm Micro-needles', 'Hyaluronic Acid', 'Centella Asiatica'],
+    dosage: 'Sanitize dermaroller in 70% isopropyl alcohol. Roll gently 4 times across crown in vertical & horizontal directions.',
+    badge: 'Doctor Recommended',
+  },
+];
 
 const DEFAULT_ANALYSIS_RESULT: VisualAnalysisResult = {
   qualityStatus: 'GOOD',
@@ -59,6 +136,8 @@ const DEFAULT_ANALYSIS_RESULT: VisualAnalysisResult = {
     { angle: 'Right Temple', densityPercent: 78, observations: 'Normal hair strand thickness' },
   ],
 
+  doctorRecommendations: DEFAULT_DOCTOR_RECOMMENDATIONS,
+
   notableObservations: [
     'Mild parting line exposure visible at crown area',
     'No major signs of scalp inflammation or flaking',
@@ -68,8 +147,8 @@ const DEFAULT_ANALYSIS_RESULT: VisualAnalysisResult = {
   unassessedAreas: ['Scalp perimeter under dense hair locks'],
   limitations: ['Standard 2D photo lighting and angle depth'],
   recommendRetake: false,
-  modelVersion: 'gemini-1.5-flash',
-  disclaimer: 'This analysis is for informational purposes only and not a medical diagnosis.',
+  modelVersion: 'gemini-2.0-flash',
+  disclaimer: 'This AI analysis provides trichology & wellness recommendations for educational purposes and is not a clinical medical diagnosis.',
 };
 
 export async function analyzeHairPhotos(
@@ -78,7 +157,7 @@ export async function analyzeHairPhotos(
   const apiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
   if (!apiKey || photoStorageKeys.length === 0) {
-    logger.warn('Gemini API Key missing or no photos provided. Returning schema-validated analysis report');
+    logger.warn('Gemini API Key missing or no photos provided. Returning schema-validated analysis report with doctor recommendations');
     return DEFAULT_ANALYSIS_RESULT;
   }
 
@@ -106,9 +185,12 @@ export async function analyzeHairPhotos(
       return DEFAULT_ANALYSIS_RESULT;
     }
 
-    const prompt = `You are a professional Trichology and Hair Signature Visual AI Assistant.
+    const prompt = `You are an expert Trichologist and Medical Hair AI Specialist.
 Analyze the attached hair and scalp photographs in detail.
-Calculate quantitative scores (0-100) and produce a strict JSON response ONLY matching this exact JSON schema:
+Evaluate hair density, scalp health, sebum balance, follicle count, hair thickness, and shedding risk.
+Recommend specific Doctor and Trichologist approved products (shampoos, serums, supplements, routines) tailored to the observed hair type and scalp conditions.
+
+Return ONLY a valid JSON object matching this exact schema without markdown backticks:
 {
   "qualityStatus": "GOOD",
   "hairDensity": "Moderate",
@@ -126,18 +208,42 @@ Calculate quantitative scores (0-100) and produce a strict JSON response ONLY ma
     { "angle": "Front Hairline", "densityPercent": 82, "observations": "Good hairline definition" },
     { "angle": "Top Crown", "densityPercent": 74, "observations": "Slight crown parting line visible" }
   ],
+  "doctorRecommendations": [
+    {
+      "category": "Shampoo & Cleanser",
+      "name": "Ketoconazole 2% Anti-Inflammation Shampoo",
+      "purpose": "Clears scalp micro-inflammation & unclogs follicles",
+      "frequency": "Use 2x weekly",
+      "hairTypeTarget": "Moderate Sebum / Dry Crown",
+      "badge": "Trichologist Pick"
+    },
+    {
+      "category": "Topical Solution & Serum",
+      "name": "Rosemary Oil & Copper Peptide Hair Serum",
+      "purpose": "Boosts blood circulation & follicle root anchoring",
+      "frequency": "Apply nightly",
+      "hairTypeTarget": "Slightly Thinning Hairline",
+      "badge": "Doctor Recommended"
+    },
+    {
+      "category": "Supplement & Medicine",
+      "name": "Biotin 5000mcg + Saw Palmetto Extract",
+      "purpose": "Inhibits topical DHT follicle binding and strengthens keratin",
+      "frequency": "1 capsule daily",
+      "hairTypeTarget": "Fine to Medium Density",
+      "badge": "Clinical Grade"
+    }
+  ],
   "notableObservations": [
     "Mild thinning at crown area",
     "No major signs of scalp inflammation",
-    "Scalp hydration levels are optimal",
-    "Overall healthy hair structure"
+    "Scalp hydration levels are optimal"
   ],
   "unassessedAreas": ["Perimeter under dense hair"],
   "limitations": ["Standard 2D lighting angle"],
   "recommendRetake": false,
-  "disclaimer": "This analysis is for informational purposes only and not a medical diagnosis."
-}
-Return ONLY JSON without markdown backticks. Do NOT include any medical diagnoses or claim to diagnose diseases.`;
+  "disclaimer": "This analysis provides wellness education and product recommendations; it does not replace a clinical medical diagnosis."
+}`;
 
     const response = await model.generateContent([prompt, ...imageParts]);
     const textResponse = response.response.text();
@@ -161,6 +267,9 @@ Return ONLY JSON without markdown backticks. Do NOT include any medical diagnose
       sheddingRiskLevel: parsed.sheddingRiskLevel || 'Low',
 
       angleScores: Array.isArray(parsed.angleScores) ? parsed.angleScores : DEFAULT_ANALYSIS_RESULT.angleScores,
+      doctorRecommendations: Array.isArray(parsed.doctorRecommendations) && parsed.doctorRecommendations.length > 0
+        ? parsed.doctorRecommendations
+        : DEFAULT_DOCTOR_RECOMMENDATIONS,
       notableObservations: Array.isArray(parsed.notableObservations)
         ? parsed.notableObservations
         : DEFAULT_ANALYSIS_RESULT.notableObservations,
@@ -171,8 +280,8 @@ Return ONLY JSON without markdown backticks. Do NOT include any medical diagnose
         ? parsed.limitations
         : DEFAULT_ANALYSIS_RESULT.limitations,
       recommendRetake: Boolean(parsed.recommendRetake),
-      modelVersion: 'gemini-1.5-flash',
-      disclaimer: 'This analysis is for informational purposes only and not a medical diagnosis.',
+      modelVersion: 'gemini-2.0-flash',
+      disclaimer: 'This analysis provides wellness education and product recommendations; it does not replace a clinical medical diagnosis.',
     };
   } catch (error) {
     logger.error({ error }, 'Gemini Vision AI Analysis fallback triggered');

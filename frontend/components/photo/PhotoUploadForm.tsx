@@ -58,6 +58,26 @@ export const PhotoUploadForm: React.FC = () => {
     fileInputRefs[category].current?.click();
   };
 
+  // Load existing photos from localStorage on mount
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedStr = localStorage.getItem('haircare_uploaded_photos');
+      if (savedStr) {
+        try {
+          const savedMap = JSON.parse(savedStr);
+          setSlots((prev) =>
+            prev.map((s) => {
+              if (savedMap[s.category]) {
+                return { ...s, previewUrl: savedMap[s.category] };
+              }
+              return s;
+            })
+          );
+        } catch (e) { }
+      }
+    }
+  }, []);
+
   // Handle File Upload and Preview
   const handleFileChange = async (
     category: 'FRONT_HAIRLINE' | 'TOP_SCALP' | 'LEFT_SIDE' | 'RIGHT_SIDE',
@@ -79,14 +99,14 @@ export const PhotoUploadForm: React.FC = () => {
       return;
     }
 
-    const previewUrl = URL.createObjectURL(file);
-    updateSlot(category, { file, previewUrl, error: null, isUploading: true });
+    // Create lightweight object URL preview
+    const previewObjectUrl = URL.createObjectURL(file);
+    updateSlot(category, { file, previewUrl: previewObjectUrl, error: null, isUploading: true });
 
-    // 3. Upload to Backend API
     try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       let currentSessionId = sessionId;
 
-      // Start Photo Session if not already initialized
       if (!currentSessionId && isAuthenticated) {
         const sessionRes = await apiClient.post<{ session: { id: string } }>('/photo-sessions', {
           consentGiven: true,
@@ -100,7 +120,7 @@ export const PhotoUploadForm: React.FC = () => {
         formData.append('file', file);
         formData.append('category', category);
 
-        const uploadUrl = `http://localhost:5000/api/v1/photo-sessions/${currentSessionId}/confirm-upload`;
+        const uploadUrl = `${apiBaseUrl}/api/v1/photo-sessions/${currentSessionId}/confirm-upload`;
         const res = await fetch(uploadUrl, {
           method: 'POST',
           body: formData,
@@ -111,12 +131,36 @@ export const PhotoUploadForm: React.FC = () => {
           throw new Error(data?.error?.message || 'Upload failed');
         }
 
-        updateSlot(category, { uploadedPhotoId: data.photo?.id, isUploading: false });
+        if (data.photo?.storageKey) {
+          const serverUrl = data.photo.storageKey.startsWith('http')
+            ? data.photo.storageKey
+            : `${apiBaseUrl}${data.photo.storageKey}`;
+
+          if (typeof window !== 'undefined') {
+            try {
+              const savedStr = localStorage.getItem('haircare_uploaded_photos');
+              const savedMap = savedStr ? JSON.parse(savedStr) : {};
+              savedMap[category] = serverUrl;
+              localStorage.setItem('haircare_uploaded_photos', JSON.stringify(savedMap));
+            } catch (e) {}
+          }
+          updateSlot(category, { previewUrl: serverUrl, uploadedPhotoId: data.photo?.id, isUploading: false });
+        } else {
+          updateSlot(category, { uploadedPhotoId: data.photo?.id, isUploading: false });
+        }
       } else {
-        // Fallback preview mode when running unauthenticated
+        // Unauthenticated demo fallback preview persistence
+        if (typeof window !== 'undefined') {
+          try {
+            const savedStr = localStorage.getItem('haircare_uploaded_photos');
+            const savedMap = savedStr ? JSON.parse(savedStr) : {};
+            savedMap[category] = previewObjectUrl;
+            localStorage.setItem('haircare_uploaded_photos', JSON.stringify(savedMap));
+          } catch (e) {}
+        }
         setTimeout(() => {
           updateSlot(category, { isUploading: false });
-        }, 600);
+        }, 300);
       }
     } catch (err: any) {
       updateSlot(category, { isUploading: false, error: err.message || 'Upload failed. Tap to retry.' });
@@ -142,6 +186,16 @@ export const PhotoUploadForm: React.FC = () => {
         await apiClient.delete(`/photos/${slot.uploadedPhotoId}`);
       } catch (err) {
         // Continue clearing local state
+      }
+    }
+    if (typeof window !== 'undefined') {
+      const savedStr = localStorage.getItem('haircare_uploaded_photos');
+      if (savedStr) {
+        try {
+          const savedMap = JSON.parse(savedStr);
+          delete savedMap[category];
+          localStorage.setItem('haircare_uploaded_photos', JSON.stringify(savedMap));
+        } catch (e) { }
       }
     }
     updateSlot(category, { file: null, previewUrl: null, uploadedPhotoId: undefined, error: null });
@@ -224,10 +278,10 @@ export const PhotoUploadForm: React.FC = () => {
                 <div
                   onClick={() => handleSlotClick(slot.category)}
                   className={`w-full aspect-[4/3] rounded-2xl border-2 transition-all relative overflow-hidden flex flex-col items-center justify-center cursor-pointer shadow-sm ${slot.previewUrl
-                      ? 'border-[#154D34] bg-white'
-                      : slot.error
-                        ? 'border-red-300 bg-red-50'
-                        : 'border-dashed border-gray-300 bg-white hover:border-[#154D34]/50 hover:bg-gray-50'
+                    ? 'border-[#154D34] bg-white'
+                    : slot.error
+                      ? 'border-red-300 bg-red-50'
+                      : 'border-dashed border-gray-300 bg-white hover:border-[#154D34]/50 hover:bg-gray-50'
                     }`}
                 >
                   {slot.previewUrl ? (

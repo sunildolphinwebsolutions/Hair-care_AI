@@ -34,6 +34,18 @@ export const AnalyzingProgress: React.FC<{ sessionId?: string }> = ({ sessionId 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const activeSessionId =
+      sessionId ||
+      (typeof window !== 'undefined' ? localStorage.getItem('haircare_photo_session_id') : null);
+
+    if (activeSessionId) {
+      apiClient
+        .post(`/photo-sessions/${activeSessionId}/analyze`)
+        .catch((err) => {
+          console.warn('AI analysis API notice:', err.message);
+        });
+    }
+
     // Animate checklist progress over time
     const t1 = setTimeout(() => {
       setChecklist((prev) =>
@@ -67,15 +79,16 @@ export const AnalyzingProgress: React.FC<{ sessionId?: string }> = ({ sessionId 
       clearTimeout(t3);
       clearTimeout(t4);
     };
-  }, [router]);
+  }, [router, sessionId]);
 
   return (
     <div className="max-w-md mx-auto bg-[#F8FAF8] text-[#1F2937] rounded-3xl shadow-xl border border-emerald-900/10 overflow-hidden font-sans my-4">
       {/* Step Progress Header 3/4 matching reference UI */}
       <div className="px-6 pt-5 pb-3 flex items-center justify-between border-b border-gray-100">
         <button
-          onClick={() => router.push('/upload-photos')}
-          className="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors"
+          onClick={() => router.push('/onboarding')}
+          className="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors cursor-pointer"
+          title="Back to Questionnaire"
         >
           <ArrowLeft className="w-4 h-4" />
         </button>

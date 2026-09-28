@@ -21,7 +21,8 @@ import {
     ChevronRight,
     ArrowRight,
     Sprout,
-    Sparkles
+    Sparkles,
+    Utensils
 } from 'lucide-react';
 
 interface AppLayoutProps {
@@ -40,9 +41,29 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     const router = useRouter();
 
     useEffect(() => {
+        // Prevent third-party browser extension injected script errors (e.g., Kaspersky 200.js / M_ID) from breaking Next.js overlay
+        const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+            const reasonStr = String(event?.reason?.message || event?.reason?.stack || event?.reason || '');
+            if (
+                reasonStr.includes('M_ID') ||
+                reasonStr.includes('200.js') ||
+                reasonStr.includes('chrome-extension://') ||
+                reasonStr.includes('moz-extension://')
+            ) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        };
+
+        window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
         if (isAuthenticated) {
             fetchNotifications();
         }
+
+        return () => {
+            window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+        };
     }, [isAuthenticated]);
 
     const fetchNotifications = async () => {
@@ -67,7 +88,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         { label: 'My Analysis', href: '/analysis', icon: Search },
         { label: 'Progress Tracker', href: '/progress', icon: TrendingUp },
         { label: 'My Plan', href: '/plan', icon: FileText },
-        { label: 'Meal Plans', href: '/routine', icon: Calendar },
+        { label: 'Meal Plans', href: '/meal-plans', icon: Utensils },
         { label: 'Reminders', href: '/routine', icon: Bell },
         { label: 'My Profile', href: '/onboarding', icon: UserIcon },
         { label: 'Settings', href: '/onboarding', icon: Settings },

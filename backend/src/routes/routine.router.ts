@@ -2,15 +2,9 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/db';
 import { requireAuth } from '../middleware/auth';
-import { AppError } from '../middleware/errorHandler';
 import { validateRequest } from '../middleware/validate';
-import { logger } from '../middleware/logger';
 
 export const routineRouter = Router();
-
-const db = prisma as any;
-const mockRoutineStore = new Map<string, any>();
-const mockLogStore = new Map<string, any[]>();
 
 // Zod Validation Schemas
 const createRoutineSchema = z.object({
@@ -18,13 +12,8 @@ const createRoutineSchema = z.object({
     title: z.string().min(2, 'Routine title is required'),
     description: z.string().optional(),
     frequency: z.string().default('Daily'),
-    items: z.array(
-      z.object({
-        stepName: z.string().min(1, 'Step name is required'),
-        stepOrder: z.number().default(1),
-        instructions: z.string().optional(),
-      })
-    ).optional(),
+    time: z.string().optional(),
+    category: z.string().optional(),
   }),
 });
 
@@ -36,53 +25,97 @@ const logRoutineSchema = z.object({
   }),
 });
 
-// Seed default sample routines if none exist
-const DEFAULT_ROUTINES = [
+const DEFAULT_INITIAL_ROUTINES = [
   {
-    id: 'routine_gentle_wash',
-    title: 'Gentle Cleansing Wash',
-    description: 'Sulfate-free scalp cleansing & moisture restoration',
+    title: 'Sulfate-Free Scalp Wash & Condition',
+    description: 'Deep cleansing with lukewarm water followed by moisture locking conditioner.',
     frequency: '2-3 times/week',
+    time: '08:30 AM',
+    category: 'Wash Routine',
     isAI: true,
-    items: [
-      { id: 'item_1', stepName: 'Sulfate-Free Shampoo', stepOrder: 1, instructions: 'Massage into wet scalp for 2 minutes' },
-      { id: 'item_2', stepName: 'Moisture Conditioner', stepOrder: 2, instructions: 'Apply from mid-lengths to ends, rinse with cool water' },
-    ],
   },
   {
-    id: 'routine_scalp_massage',
-    title: 'Daily Scalp Massage',
-    description: 'Fingertip scalp stimulation for microcirculation',
+    title: '5-Minute Stimulating Scalp Massage',
+    description: 'Use fingertips in circular motion with 2 drops of jojoba or rosemary oil to boost micro-circulation.',
     frequency: 'Daily',
+    time: '09:00 PM',
+    category: 'Scalp Care',
     isAI: true,
-    items: [
-      { id: 'item_3', stepName: 'Scalp Massage & Jojoba Oil', stepOrder: 1, instructions: 'Circular pressure for 5 minutes' },
-    ],
+  },
+  {
+    title: 'Biotin & Omega-3 Snack Intake',
+    description: 'Consume a handful of walnuts, pumpkin seeds, and green tea for hair follicle nourishment.',
+    frequency: 'Daily',
+    time: '04:30 PM',
+    category: 'Supplements',
+    isAI: true,
+  },
+  {
+    title: 'Hydration Target (2.5 Liters)',
+    description: 'Ensure 8 full glasses of water throughout the day to keep scalp sebum balance optimal.',
+    frequency: 'Daily',
+    time: '02:00 PM',
+    category: 'Meals',
+    isAI: false,
   },
 ];
 
-// 1. GET /api/v1/routines — List User Routines
+// 1. GET /api/v1/routines — List User Routines from PostgreSQL DB
 routineRouter.get('/routines', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id;
-    let routines = [];
-    let isDbAvailable = true;
 
-    try {
-      if (db.routine) {
-        routines = await db.routine.findMany({
-          where: { userId },
-          include: { items: true, logs: true },
-          orderBy: { createdAt: 'desc' },
+    // Fetch user routines from PostgreSQL database
+    let routines = await prisma.routine.findMany({
+      where: { userId },
+      include: {
+        logs: {
+          orderBy: { completedAt: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Check if user has an entry in UserPreference / routine tracker
+    const hasInitialized = await prisma.notificationPreference.findUnique({
+      where: { userId },
+    });
+
+    // Seed initial routines only if brand new user and never initialized
+    if (!routines.length && !hasInitialized) {
+      for (const def of DEFAULT_INITIAL_ROUTINES) {
+        await prisma.routine.create({
+          data: {
+            userId,
+            title: def.title,
+            description: def.description,
+            frequency: def.frequency,
+            time: def.time,
+            category: def.category,
+            isAI: def.isAI,
+          },
         });
       }
-    } catch (err) {
-      isDbAvailable = false;
-    }
 
-    if (!isDbAvailable || !routines.length) {
-      routines = mockRoutineStore.get(userId) || DEFAULT_ROUTINES.map((r) => ({ ...r, userId }));
-      mockRoutineStore.set(userId, routines);
+      await prisma.notificationPreference.create({
+        data: {
+          userId,
+          remindersEnabled: true,
+          reminderTime: '09:00',
+        },
+      }).catch(() => {});
+
+      routines = await prisma.routine.findMany({
+        where: { userId },
+        include: {
+          logs: {
+            orderBy: { completedAt: 'desc' },
+            take: 1,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
     }
 
     res.json({
@@ -94,7 +127,7 @@ routineRouter.get('/routines', requireAuth, async (req: Request, res: Response, 
   }
 });
 
-// 2. POST /api/v1/routines — Create Routine
+// 2. POST /api/v1/routines — Create Routine in Database
 routineRouter.post(
   '/routines',
   requireAuth,
@@ -102,51 +135,19 @@ routineRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.id;
-      const { title, description, frequency, items } = req.body;
+      const { title, description, frequency, time, category } = req.body;
 
-      let createdRoutine = null;
-      let isDbAvailable = true;
-
-      try {
-        if (db.routine) {
-          createdRoutine = await db.routine.create({
-            data: {
-              userId,
-              title,
-              description,
-              frequency,
-              isAI: false,
-              items: {
-                create: (items || []).map((it: any, idx: number) => ({
-                  stepName: it.stepName,
-                  stepOrder: it.stepOrder || idx + 1,
-                  instructions: it.instructions || '',
-                })),
-              },
-            },
-            include: { items: true },
-          });
-        }
-      } catch (err) {
-        isDbAvailable = false;
-      }
-
-      if (!isDbAvailable || !createdRoutine) {
-        const id = `routine_${Date.now()}`;
-        createdRoutine = {
-          id,
+      const createdRoutine = await prisma.routine.create({
+        data: {
           userId,
           title,
-          description,
-          frequency,
+          description: description || '',
+          frequency: frequency || 'Daily',
+          time: time || '09:00 AM',
+          category: category || 'Scalp Care',
           isAI: false,
-          items: items || [],
-          createdAt: new Date().toISOString(),
-        };
-
-        const existingList = mockRoutineStore.get(userId) || DEFAULT_ROUTINES;
-        mockRoutineStore.set(userId, [createdRoutine, ...existingList]);
-      }
+        },
+      });
 
       res.status(201).json({
         success: true,
@@ -159,69 +160,37 @@ routineRouter.post(
   }
 );
 
-// 3. PATCH /api/v1/routines/:id — Update Routine
+// 3. PATCH /api/v1/routines/:id — Update Routine in Database
 routineRouter.patch('/routines/:id', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
     const updateData = req.body;
 
-    let updatedRoutine = null;
-    let isDbAvailable = true;
-
-    try {
-      if (db.routine) {
-        updatedRoutine = await db.routine.update({
-          where: { id },
-          data: updateData,
-          include: { items: true },
-        });
-      }
-    } catch (err) {
-      isDbAvailable = false;
-    }
-
-    if (!isDbAvailable || !updatedRoutine) {
-      const userRoutines = mockRoutineStore.get(userId) || DEFAULT_ROUTINES;
-      updatedRoutine = userRoutines.find((r: any) => r.id === id);
-      if (updatedRoutine) {
-        Object.assign(updatedRoutine, updateData);
-      }
-    }
+    const updatedRoutine = await prisma.routine.updateMany({
+      where: { id, userId },
+      data: updateData,
+    });
 
     res.json({
       success: true,
       message: 'Routine updated',
-      routine: updatedRoutine,
+      updatedRoutine,
     });
   } catch (error) {
     next(error);
   }
 });
 
-// 4. DELETE /api/v1/routines/:id — Delete Routine
+// 4. DELETE /api/v1/routines/:id — Delete Routine from Database
 routineRouter.delete('/routines/:id', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const userId = req.user!.id;
 
-    let isDbAvailable = true;
-
-    try {
-      if (db.routine) {
-        await db.routine.delete({ where: { id } });
-      }
-    } catch (err) {
-      isDbAvailable = false;
-    }
-
-    if (!isDbAvailable) {
-      const userRoutines = mockRoutineStore.get(userId) || [];
-      mockRoutineStore.set(
-        userId,
-        userRoutines.filter((r: any) => r.id !== id)
-      );
-    }
+    await prisma.routine.deleteMany({
+      where: { id, userId },
+    });
 
     res.json({
       success: true,
@@ -232,7 +201,7 @@ routineRouter.delete('/routines/:id', requireAuth, async (req: Request, res: Res
   }
 });
 
-// 5. POST /api/v1/routines/:id/logs — Record Activity Log (Complete/Skip/NA)
+// 5. POST /api/v1/routines/:id/logs — Record Activity Log in Database
 routineRouter.post(
   '/routines/:id/logs',
   requireAuth,
@@ -243,40 +212,15 @@ routineRouter.post(
       const userId = req.user!.id;
       const { status, rating, notes } = req.body;
 
-      let createdLog = null;
-      let isDbAvailable = true;
-
-      try {
-        if (db.routineLog) {
-          createdLog = await db.routineLog.create({
-            data: {
-              userId,
-              routineId,
-              status: status || 'COMPLETED',
-              rating: rating || null,
-              notes: notes || null,
-            },
-          });
-        }
-      } catch (err) {
-        isDbAvailable = false;
-      }
-
-      if (!isDbAvailable || !createdLog) {
-        const logId = `log_${Date.now()}`;
-        createdLog = {
-          id: logId,
+      const createdLog = await prisma.routineLog.create({
+        data: {
           userId,
           routineId,
           status: status || 'COMPLETED',
           rating: rating || null,
           notes: notes || null,
-          completedAt: new Date().toISOString(),
-        };
-
-        const existingLogs = mockLogStore.get(routineId) || [];
-        mockLogStore.set(routineId, [createdLog, ...existingLogs]);
-      }
+        },
+      });
 
       res.status(201).json({
         success: true,
@@ -295,24 +239,11 @@ routineRouter.get('/routines/:id/logs', requireAuth, async (req: Request, res: R
     const { id: routineId } = req.params;
     const userId = req.user!.id;
 
-    let logs = [];
-    let isDbAvailable = true;
-
-    try {
-      if (db.routineLog) {
-        logs = await db.routineLog.findMany({
-          where: { routineId, userId },
-          orderBy: { completedAt: 'desc' },
-          take: 30,
-        });
-      }
-    } catch (err) {
-      isDbAvailable = false;
-    }
-
-    if (!isDbAvailable || !logs.length) {
-      logs = mockLogStore.get(routineId) || [];
-    }
+    const logs = await prisma.routineLog.findMany({
+      where: { routineId, userId },
+      orderBy: { completedAt: 'desc' },
+      take: 30,
+    });
 
     res.json({
       success: true,
@@ -322,3 +253,4 @@ routineRouter.get('/routines/:id/logs', requireAuth, async (req: Request, res: R
     next(error);
   }
 });
+

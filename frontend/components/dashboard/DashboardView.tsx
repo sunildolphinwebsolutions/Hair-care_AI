@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { apiClient } from '@/lib/api-client';
 import {
   Calendar,
   Heart,
@@ -36,6 +37,59 @@ export function DashboardView() {
   const [activeTipIndex, setActiveTipIndex] = useState(0);
   const [reminderDone, setReminderDone] = useState<Record<string, boolean>>({});
 
+  const [progressPhotos, setProgressPhotos] = useState<Array<{ date: string; url: string; category?: string }>>([
+    { date: 'Front Hairline', category: 'FRONT_HAIRLINE', url: '/images/front_hairline.jpg' },
+    { date: 'Top Scalp', category: 'TOP_SCALP', url: '/images/scalp_progress.jpg' },
+    { date: 'Left Side', category: 'LEFT_SIDE', url: '/images/side_profile.jpg' },
+    { date: 'Right Side', category: 'RIGHT_SIDE', url: '/images/side_profile.jpg' },
+  ]);
+
+  useEffect(() => {
+    // 1. Restore from localStorage map on mount
+    if (typeof window !== 'undefined') {
+      const savedStr = localStorage.getItem('haircare_uploaded_photos');
+      if (savedStr) {
+        try {
+          const map = JSON.parse(savedStr);
+          setProgressPhotos((prev) =>
+            prev.map((item) => {
+              if (item.category && map[item.category]) {
+                return { ...item, url: map[item.category], date: `${item.date} (Uploaded)` };
+              }
+              return item;
+            })
+          );
+        } catch (e) {}
+      }
+    }
+
+    // 2. Retrieve logged in session photos from backend API
+    apiClient
+      .get<{ sessions: any[] }>('/photo-sessions')
+      .then((res) => {
+        if (res.sessions && res.sessions.length > 0) {
+          const latestSession = res.sessions[0];
+          if (latestSession.photos && latestSession.photos.length > 0) {
+            const photoMap: Record<string, string> = {};
+            latestSession.photos.forEach((p: any) => {
+              if (p.category && p.storageKey) {
+                photoMap[p.category] = `http://localhost:5000${p.storageKey}`;
+              }
+            });
+            setProgressPhotos((prev) =>
+              prev.map((item) => {
+                if (item.category && photoMap[item.category]) {
+                  return { ...item, url: photoMap[item.category] };
+                }
+                return item;
+              })
+            );
+          }
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const tips = [
     "Drink enough water! Hydration supports healthy hair and scalp.",
     "Scalp massage for 5 mins daily boosts follicle blood circulation.",
@@ -52,14 +106,6 @@ export function DashboardView() {
   };
 
   const userName = user?.name || 'Ananya';
-
-  // 4 Scalp progress photos matching screenshot dates
-  const progressPhotos = [
-    { date: '12 Jun 2025', url: '/images/scalp_progress.jpg' },
-    { date: '12 Jul 2025', url: '/images/scalp_progress.jpg' },
-    { date: '12 Aug 2025', url: '/images/scalp_progress.jpg' },
-    { date: '12 Sep 2025', url: '/images/scalp_progress.jpg' },
-  ];
 
   return (
     <div className="space-y-6 w-full pb-10 text-[#12241A] font-sans selection:bg-[#0B3C26] selection:text-white">
@@ -473,8 +519,11 @@ export function DashboardView() {
 
         {/* Upcoming Reminders Card (Span 6 Cols) */}
         <div className="lg:col-span-6 bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 w-full">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-extrabold text-[#082014] font-heading">Upcoming Reminders</h3>
+          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+            <div>
+              <h3 className="text-base font-extrabold text-[#082014] font-heading">Upcoming Reminders</h3>
+              <p className="text-[11px] text-[#55695D] font-medium mt-0.5">Day-wise routine schedule & push alarms</p>
+            </div>
             <button
               type="button"
               onClick={() => router.push('/routine')}
@@ -482,6 +531,48 @@ export function DashboardView() {
             >
               View All <ArrowRight className="w-3.5 h-3.5" />
             </button>
+          </div>
+
+          {/* 7-Day Adherence Matrix Mini Strip */}
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2 w-full pt-1 pb-2">
+            {(() => {
+              const dayNames = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+              const currentJsDayIndex = new Date().getDay();
+              const todayIndex = (currentJsDayIndex + 6) % 7;
+              const currentTodayName = dayNames[todayIndex];
+
+              return dayNames.map((day, idx) => {
+                const isToday = day === currentTodayName;
+                const isDone = idx < todayIndex;
+                return (
+                  <div
+                    key={idx}
+                    className={`py-2 px-1 rounded-xl border text-center space-y-0.5 transition flex flex-col items-center justify-between ${
+                      isToday
+                        ? 'bg-[#FFFDF0] border-2 border-amber-400 shadow-xs ring-1 ring-amber-300/40'
+                        : isDone
+                        ? 'bg-[#F4FAF4] border-[#CCE0CC]'
+                        : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    <span className={`text-[10px] font-black uppercase font-mono ${
+                      isToday ? 'text-amber-900 font-extrabold' : 'text-[#4F6256]'
+                    }`}>
+                      {isToday ? 'TODAY' : day}
+                    </span>
+                    <div className="flex justify-center pt-0.5">
+                      {isDone ? (
+                        <CheckCircle2 className="w-4 h-4 text-[#16A34A]" />
+                      ) : isToday ? (
+                        <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-gray-400" />
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
 
           <div className="space-y-3 w-full">

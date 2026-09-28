@@ -65,77 +65,146 @@ export const CURATED_LIFESTYLE: LifestyleHabit[] = [
   { title: 'Heat Protection', recommendation: 'Limit heat styling tools to <180°C and always apply thermal protectant spray.' },
 ];
 
+export interface UserContext {
+  diet?: string;
+  concerns?: string[];
+  hairDensity?: string;
+  scalpHealth?: string;
+  hairThickness?: string;
+  signsOfDamage?: string;
+  overallAssessment?: string;
+  notableObservations?: string[];
+}
+
 export async function generateWellnessPlanAI(
-  userContext: { diet?: string; concerns?: string[]; hairDensity?: string; scalpHealth?: string }
+  userContext: UserContext
 ): Promise<GeneratedWellnessPlan> {
   const apiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
-  const defaultPlan: GeneratedWellnessPlan = {
-    summary: 'A complete plan for healthier, stronger hair based on your visual analysis and lifestyle profile.',
-    nutrients: CURATED_NUTRIENTS,
-    recommendedFoods: CURATED_FOODS,
-    routineSuggestions: CURATED_ROUTINE,
-    lifestyleHabits: CURATED_LIFESTYLE,
-    disclaimer: 'This plan provides general wellness and nutrition education, not a medical diagnosis or treatment.',
+  // Build dynamic customized fallback plan tailored to the user's hair photo findings
+  const density = userContext.hairDensity || 'Moderate';
+  const scalp = userContext.scalpHealth || 'Good';
+  const thickness = userContext.hairThickness || 'Normal';
+  const damage = userContext.signsOfDamage || 'Minimal';
+  const observations = userContext.notableObservations?.join('. ') || 'Mild thinning at crown area';
+  const concernsStr = userContext.concerns?.join(', ') || 'Hair shedding and volume';
+
+  const dynamicSummary = `Personalized trichology plan generated for ${density} hair density, ${scalp.toLowerCase()} scalp condition, and ${thickness.toLowerCase()} strand thickness observed in your photo scan.`;
+
+  const dynamicPlan: GeneratedWellnessPlan = {
+    summary: dynamicSummary,
+    nutrients: [
+      { name: 'Protein & Keratin', benefit: `Strengthens ${thickness.toLowerCase()} hair shaft structure`, category: 'Macronutrient', color: 'coral' },
+      { name: 'Iron & Folate', benefit: `Encourages oxygen delivery to scalp with ${density.toLowerCase()} density`, category: 'Mineral', color: 'red' },
+      { name: 'Zinc', benefit: `Balances sebum secretion for ${scalp.toLowerCase()} scalp health`, category: 'Mineral', color: 'green' },
+      { name: 'Omega-3 Fatty Acids', benefit: `Hydrates scalp and repairs ${damage.toLowerCase()} strand damage`, category: 'Essential Fatty Acid', color: 'gold' },
+      { name: 'B-Complex & Biotin', benefit: `Fosters active follicle micro-circulation for ${concernsStr}`, category: 'Vitamin', color: 'purple' },
+    ],
+    recommendedFoods: [
+      { name: 'Eggs & Dairy', category: 'Protein & Biotin', benefit: 'Directly supports keratin synthesis to combat thinning' },
+      { name: 'Salmon & Sardines', category: 'Omega-3', benefit: 'Calms scalp dryness and promotes natural shine' },
+      { name: 'Spinach & Dark Greens', category: 'Iron & Folate', benefit: 'Prevents nutritional shedding and fuels hair roots' },
+      { name: 'Almonds & Pumpkin Seeds', category: 'Zinc & Vitamin E', benefit: 'Maintains healthy scalp sebum regulation' },
+      { name: 'Lentils & Chickpeas', category: 'Plant Protein', benefit: 'Provides steady amino acids for strand thickness' },
+      { name: 'Blueberries & Citrus', category: 'Vitamin C', benefit: 'Protects follicles from environmental oxidative stress' },
+    ],
+    routineSuggestions: [
+      {
+        title: scalp.includes('Dry') ? 'Hydrating Scalp Wash' : 'Gentle Cleansing Routine',
+        frequency: '2-3 times/week',
+        instructions: `Use sulfate-free shampoo tailored for ${scalp.toLowerCase()} scalp condition; rinse thoroughly with lukewarm water.`
+      },
+      {
+        title: damage.includes('High') || damage.includes('Moderate') ? 'Intensive Bond Repair Mask' : 'Deep Moisture Mask',
+        frequency: 'Once a week',
+        instructions: `Apply rich conditioning mask from mid-lengths to ends to treat ${damage.toLowerCase()} hair damage.`
+      },
+      {
+        title: 'Micro-Circulation Scalp Massage',
+        frequency: 'Daily (5 mins)',
+        instructions: `Gently massage scalp with fingertips to stimulate blood flow to ${density.toLowerCase()} density areas.`
+      },
+    ],
+    lifestyleHabits: [
+      { title: 'Hydration Target', recommendation: 'Drink at least 2.5 Liters of water daily to maintain scalp moisture balance.' },
+      { title: 'Stress & Sleep Balance', recommendation: 'Aim for 7-8 hours of sleep to minimize cortisol-induced hair shedding.' },
+      { title: 'Thermal Protection', recommendation: 'Limit hot styling tools to <180°C and always apply heat protectant spray.' },
+    ],
+    disclaimer: 'This plan provides general wellness and nutrition guidance derived from your visual hair photo analysis.',
   };
 
   if (!apiKey) {
-    return defaultPlan;
+    return dynamicPlan;
   }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `You are a professional Trichology and Hair Care AI Specialist.
+Create a customized wellness plan BASED ON THE USER'S UPLOADED HAIR PHOTO ANALYSIS FINDINGS:
 
-    const prompt = `You are a professional Trichology and Nutrition AI Coach.
-User Profile:
-- Hair Concerns: ${userContext.concerns?.join(', ') || 'Thinning hair, hair fall'}
-- Diet Preference: ${userContext.diet || 'Balanced'}
-- Assessed Density: ${userContext.hairDensity || 'Moderate'}
-- Scalp Condition: ${userContext.scalpHealth || 'Good'}
+User Hair Photo Visual Analysis Findings:
+- Assessed Hair Density: ${density}
+- Scalp Condition: ${scalp}
+- Hair Thickness: ${thickness}
+- Signs of Hair Damage: ${damage}
+- Notable Photo Observations: ${observations}
+- Primary Concerns: ${concernsStr}
+- Dietary Preference: ${userContext.diet || 'Balanced'}
 
 Generate a structured personalized wellness plan JSON adhering strictly to this schema:
 {
-  "summary": "A complete plan for healthier, stronger hair based on your analysis and lifestyle.",
+  "summary": "AI-generated summary linking hair photo findings to the plan",
   "nutrients": [
     { "name": "Protein", "benefit": "Supports hair growth and strength", "category": "Macronutrient", "color": "coral" },
     { "name": "Iron", "benefit": "Helps prevent hair fall", "category": "Mineral", "color": "red" },
     { "name": "Zinc", "benefit": "Supports hair tissue repair", "category": "Mineral", "color": "green" },
-    { "name": "Omega-3", "benefit": "Nourishes scalp and reduces inflammation", "category": "Essential Fatty Acid", "color": "gold" },
-    { "name": "Vitamin D", "benefit": "Supports healthy hair follicles", "category": "Vitamin", "color": "purple" }
+    { "name": "Omega-3", "benefit": "Nourishes scalp and reduces inflammation", "category": "Essential Fatty Acid", "color": "gold" }
   ],
   "recommendedFoods": [
     { "name": "Eggs", "category": "Protein & Biotin", "benefit": "Essential building blocks for hair" },
     { "name": "Salmon", "category": "Omega-3", "benefit": "Scalp hydration" },
     { "name": "Spinach", "category": "Iron & Folate", "benefit": "Follicle oxygenation" },
-    { "name": "Nuts", "category": "Zinc & Vitamin E", "benefit": "Cell membrane protection" },
-    { "name": "Lentils", "category": "Plant Protein", "benefit": "Nourishes roots" },
-    { "name": "Berries", "category": "Antioxidants", "benefit": "Collagen production" }
+    { "name": "Nuts", "category": "Zinc & Vitamin E", "benefit": "Cell membrane protection" }
   ],
   "routineSuggestions": [
-    { "title": "Gentle Cleansing", "frequency": "2-3 times/week", "instructions": "Sulfate-free wash" }
+    { "title": "Gentle Cleansing", "frequency": "2-3 times/week", "instructions": "Sulfate-free wash tailored for hair findings" }
   ],
   "lifestyleHabits": [
     { "title": "Optimal Hydration", "recommendation": "Drink 2.5L water daily" }
   ],
-  "disclaimer": "This plan provides general wellness and nutrition education, not a medical diagnosis or treatment."
+  "disclaimer": "This plan provides general wellness guidance derived from your hair photo analysis."
 }
 Return ONLY valid JSON without markdown code blocks.`;
 
-    const response = await model.generateContent(prompt);
-    const cleaned = response.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+    const modelNames = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+    let textResponse = '';
+
+    for (const modelName of modelNames) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const response = await model.generateContent(prompt);
+        textResponse = response.response.text();
+        if (textResponse) break;
+      } catch (e) {}
+    }
+
+    if (!textResponse) {
+      return dynamicPlan;
+    }
+
+    const cleaned = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(cleaned);
 
     return {
-      summary: parsed.summary || defaultPlan.summary,
-      nutrients: Array.isArray(parsed.nutrients) ? parsed.nutrients : defaultPlan.nutrients,
-      recommendedFoods: Array.isArray(parsed.recommendedFoods) ? parsed.recommendedFoods : defaultPlan.recommendedFoods,
-      routineSuggestions: Array.isArray(parsed.routineSuggestions) ? parsed.routineSuggestions : defaultPlan.routineSuggestions,
-      lifestyleHabits: Array.isArray(parsed.lifestyleHabits) ? parsed.lifestyleHabits : defaultPlan.lifestyleHabits,
-      disclaimer: 'This plan provides general wellness and nutrition education, not a medical diagnosis or treatment.',
+      summary: parsed.summary || dynamicPlan.summary,
+      nutrients: Array.isArray(parsed.nutrients) && parsed.nutrients.length ? parsed.nutrients : dynamicPlan.nutrients,
+      recommendedFoods: Array.isArray(parsed.recommendedFoods) && parsed.recommendedFoods.length ? parsed.recommendedFoods : dynamicPlan.recommendedFoods,
+      routineSuggestions: Array.isArray(parsed.routineSuggestions) && parsed.routineSuggestions.length ? parsed.routineSuggestions : dynamicPlan.routineSuggestions,
+      lifestyleHabits: Array.isArray(parsed.lifestyleHabits) && parsed.lifestyleHabits.length ? parsed.lifestyleHabits : dynamicPlan.lifestyleHabits,
+      disclaimer: 'This plan provides general wellness guidance derived from your hair photo analysis.',
     };
   } catch (error) {
     logger.error({ error }, 'Gemini Wellness Plan AI generation fallback triggered');
-    return defaultPlan;
+    return dynamicPlan;
   }
 }

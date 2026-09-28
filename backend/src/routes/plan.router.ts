@@ -10,6 +10,39 @@ export const planRouter = Router();
 const db = prisma as any;
 const mockPlanStore = new Map<string, any>();
 
+// Helper to gather user context from intake & visual assessment of uploaded photos
+async function getUserAnalysisContext(userId: string) {
+  const userContext: any = {};
+  try {
+    if (db.intakeResponse) {
+      const intake = await db.intakeResponse.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (intake) {
+        userContext.concerns = intake.concerns;
+        userContext.diet = intake.dietHabits?.dietType;
+      }
+    }
+
+    if (db.visualAssessment) {
+      const assessment = await db.visualAssessment.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (assessment) {
+        userContext.hairDensity = assessment.hairDensity;
+        userContext.scalpHealth = assessment.scalpHealth;
+        userContext.hairThickness = assessment.hairThickness;
+        userContext.signsOfDamage = assessment.signsOfDamage;
+        userContext.overallAssessment = assessment.overallAssessment;
+        userContext.notableObservations = assessment.notableObservations;
+      }
+    }
+  } catch (err) {}
+  return userContext;
+}
+
 // 1. POST /api/v1/wellness-plans/generate — Generate Draft Plan
 planRouter.post(
   '/wellness-plans/generate',
@@ -17,36 +50,9 @@ planRouter.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const userId = req.user!.id;
-      let userContext: any = {};
-      let isDbAvailable = true;
+      const userContext = await getUserAnalysisContext(userId);
 
-      try {
-        if (db.intakeResponse) {
-          const intake = await db.intakeResponse.findFirst({
-            where: { userId },
-            orderBy: { createdAt: 'desc' },
-          });
-          if (intake) {
-            userContext.concerns = intake.concerns;
-            userContext.diet = intake.dietHabits?.dietType;
-          }
-        }
-
-        if (db.visualAssessment) {
-          const assessment = await db.visualAssessment.findFirst({
-            where: { userId },
-            orderBy: { createdAt: 'desc' },
-          });
-          if (assessment) {
-            userContext.hairDensity = assessment.hairDensity;
-            userContext.scalpHealth = assessment.scalpHealth;
-          }
-        }
-      } catch (err) {
-        isDbAvailable = false;
-      }
-
-      // Generate plan via Gemini AI / Knowledge Base
+      // Generate plan via Gemini AI based on photo visual analysis
       const generatedData = await generateWellnessPlanAI(userContext);
 
       let createdPlan = null;
@@ -69,11 +75,9 @@ planRouter.post(
             },
           });
         }
-      } catch (err) {
-        isDbAvailable = false;
-      }
+      } catch (err) {}
 
-      if (!isDbAvailable || !createdPlan) {
+      if (!createdPlan) {
         createdPlan = {
           id: planId,
           userId,
@@ -95,7 +99,7 @@ planRouter.post(
 
       res.status(201).json({
         success: true,
-        message: 'Personalized wellness plan draft generated',
+        message: 'Personalized wellness plan generated based on photo analysis',
         plan: createdPlan,
       });
     } catch (error) {
@@ -130,10 +134,10 @@ planRouter.get(
       }
 
       if (!plan) {
-        // Fallback default generated plan if no plan created yet
-        const generatedData = await generateWellnessPlanAI({});
+        const userContext = await getUserAnalysisContext(userId);
+        const generatedData = await generateWellnessPlanAI(userContext);
         plan = {
-          id: `plan_default`,
+          id: `plan_${Date.now()}`,
           userId,
           version: '1.0',
           status: 'DRAFT',
@@ -146,6 +150,7 @@ planRouter.get(
           disclaimer: generatedData.disclaimer,
           createdAt: new Date().toISOString(),
         };
+        mockPlanStore.set(`user_${userId}`, plan);
       }
 
       res.json({

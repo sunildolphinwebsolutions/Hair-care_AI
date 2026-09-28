@@ -1,533 +1,302 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiClient } from '@/lib/api-client';
 import {
-  FileText,
-  Utensils,
-  Droplets,
-  Leaf,
-  Check,
-  ChevronRight,
-  ArrowRight,
-  Heart,
-  Flame,
-  Zap,
   Sparkles,
-  Download,
-  ShoppingCart,
-  Lightbulb,
-  Calendar,
+  Utensils,
+  Scissors,
+  CheckCircle2,
+  Heart,
+  RefreshCw,
+  Info,
+  ArrowRight,
+  ShieldCheck,
   Clock,
-  Target,
-  FileCheck
+  Leaf,
+  Check
 } from 'lucide-react';
+
+interface NutrientItem {
+  name: string;
+  benefit: string;
+  category?: string;
+}
+
+interface FoodItem {
+  name: string;
+  category?: string;
+  benefit: string;
+}
+
+interface RoutineSuggestion {
+  title: string;
+  frequency: string;
+  instructions: string;
+}
+
+interface LifestyleHabit {
+  title: string;
+  recommendation: string;
+}
+
+interface PlanData {
+  id?: string;
+  summary: string;
+  nutrients: NutrientItem[];
+  recommendedFoods: FoodItem[];
+  routineSuggestions: RoutineSuggestion[];
+  lifestyleHabits: LifestyleHabit[];
+  disclaimer?: string;
+}
+
+const DEFAULT_PLAN: PlanData = {
+  summary: 'A personalized trichology plan crafted for your hair density, scalp health, and nutritional profile.',
+  nutrients: [
+    { name: 'Protein', benefit: 'Supports keratin synthesis for strand strength' },
+    { name: 'Iron & Folate', benefit: 'Boosts oxygen circulation to scalp follicles' },
+    { name: 'Zinc', benefit: 'Promotes tissue repair and hair oil gland regulation' },
+    { name: 'Omega-3 Fatty Acids', benefit: 'Nourishes scalp barrier and reduces dryness' },
+  ],
+  recommendedFoods: [
+    { name: 'Eggs & Dairy', category: 'Biotin & Protein', benefit: 'Essential building blocks for hair follicle growth' },
+    { name: 'Salmon & Mackerel', category: 'Omega-3', benefit: 'Provides natural scalp hydration and reduces flaking' },
+    { name: 'Spinach & Kale', category: 'Iron & Folate', benefit: 'Prevents shedding caused by iron deficiency' },
+    { name: 'Nuts & Seeds', category: 'Zinc & Vitamin E', benefit: 'Protects scalp cell membranes from oxidative stress' },
+  ],
+  routineSuggestions: [
+    { title: 'Gentle Scalp Wash', frequency: '2-3 times/week', instructions: 'Use sulfate-free shampoo focused on scalp cleansing with lukewarm water.' },
+    { title: 'Nourishing Hair Mask', frequency: 'Once a week', instructions: 'Apply deep conditioner from mid-lengths to tips for 10-15 minutes.' },
+    { title: 'Stimulating Scalp Massage', frequency: 'Daily (5 mins)', instructions: 'Gently massage scalp with fingertips to boost micro-circulation.' },
+  ],
+  lifestyleHabits: [
+    { title: 'Optimal Hydration', recommendation: 'Drink at least 2.5 Liters of water daily to maintain scalp moisture balance.' },
+    { title: 'Stress Management', recommendation: 'Practice 10 minutes of daily mindfulness to minimize stress-induced shedding.' },
+    { title: 'Heat & Damage Protection', recommendation: 'Limit hot styling tools to <180°C and use protective thermal spray.' },
+  ],
+  disclaimer: 'This plan provides general wellness and nutrition guidance derived from your trichology analysis.',
+};
 
 export function WellnessPlanView() {
   const router = useRouter();
+  const [plan, setPlan] = useState<PlanData>(DEFAULT_PLAN);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [regenerating, setRegenerating] = useState<boolean>(false);
+  const [accepted, setAccepted] = useState<boolean>(false);
 
-  const [activeCategory, setActiveCategory] = useState<'Nutrition' | 'Hair Care' | 'Lifestyle'>('Nutrition');
-  const [selectedDay, setSelectedDay] = useState('Day 1');
-  const [tasksDone, setTasksDone] = useState<Record<string, boolean>>({
-    water: true,
-    breakfast: true,
-    greens: false,
-  });
+  useEffect(() => {
+    fetchCurrentPlan();
+  }, []);
 
-  const toggleTask = (key: string) => {
-    setTasksDone((prev) => ({ ...prev, [key]: !prev[key] }));
+  const fetchCurrentPlan = async () => {
+    setLoading(true);
+    try {
+      const res = await apiClient.get<{ plan: PlanData }>('/wellness-plans/current');
+      if (res.plan && res.plan.summary) {
+        setPlan(res.plan);
+      }
+    } catch (err) {
+      // Fallback to default clean plan
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const nutrients = [
-    {
-      name: 'Protein',
-      benefit: 'Supports hair growth and strength',
-      iconBg: 'bg-rose-100 text-rose-600',
-      icon: Heart,
-    },
-    {
-      name: 'Iron',
-      benefit: 'Helps prevent hair fall',
-      iconBg: 'bg-red-100 text-red-600',
-      icon: Flame,
-    },
-    {
-      name: 'Zinc',
-      benefit: 'Supports hair tissue repair',
-      iconBg: 'bg-emerald-100 text-emerald-700',
-      icon: Leaf,
-    },
-    {
-      name: 'Omega-3',
-      benefit: 'Nourishes scalp and reduces inflammation',
-      iconBg: 'bg-amber-100 text-amber-700',
-      icon: Droplets,
-    },
-    {
-      name: 'Vitamin D',
-      benefit: 'Supports healthy hair follicles',
-      iconBg: 'bg-purple-100 text-purple-700',
-      icon: Sparkles,
-    },
-  ];
-
-  const foods = [
-    { name: 'Eggs', benefit: 'Rich in protein and biotin', image: '/images/food_eggs.jpg' },
-    { name: 'Salmon', benefit: 'High in omega-3 fatty acids', image: '/images/food_salmon.jpg' },
-    { name: 'Spinach', benefit: 'Rich in iron and folate', image: '/images/nutrition_hero.jpg' },
-    { name: 'Nuts', benefit: 'Good source of zinc and vitamin E', image: '/images/meal_breakfast.jpg' },
-    { name: 'Lentils', benefit: 'Rich in protein and iron', image: '/images/meal_dinner.jpg' },
-    { name: 'Berries', benefit: 'High in antioxidants', image: '/images/meal_snack.jpg' },
-  ];
-
-  const mealPlan = [
-    {
-      type: 'Breakfast',
-      time: '8:00 AM',
-      description: 'Oats with berries, nuts and seeds',
-      calories: '320 kcal',
-      image: '/images/meal_breakfast.jpg',
-    },
-    {
-      type: 'Lunch',
-      time: '1:00 PM',
-      description: 'Grilled chicken, quinoa and mixed greens',
-      calories: '450 kcal',
-      image: '/images/meal_lunch.jpg',
-    },
-    {
-      type: 'Evening Snack',
-      time: '5:00 PM',
-      description: 'Protein smoothie with banana',
-      calories: '250 kcal',
-      image: '/images/meal_snack.jpg',
-    },
-    {
-      type: 'Dinner',
-      time: '8:00 PM',
-      description: 'Paneer, brown rice and steamed vegetables',
-      calories: '400 kcal',
-      image: '/images/meal_dinner.jpg',
-    },
-  ];
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    try {
+      const res = await apiClient.post<{ plan: PlanData }>('/wellness-plans/generate');
+      if (res.plan) {
+        setPlan(res.plan);
+      }
+    } catch (err) {
+      // Keep existing plan on error
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   return (
-    <div className="space-y-6 w-full pb-10 text-[#12241A] font-sans selection:bg-[#0B3C26] selection:text-white">
-      {/* 1. Page Title Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1 pb-1 w-full">
+    <div className="space-y-6 w-full pb-12 text-[#12241A] font-sans selection:bg-[#0B3C26] selection:text-white">
+      {/* 1. Clean Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1 pb-1 w-full border-b border-[#D8E4D8] pb-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#082014] tracking-tight font-heading">
-            My Plan
-          </h1>
-          <p className="text-xs sm:text-sm text-[#4E6256] font-medium mt-1">
-            A complete plan for healthier, stronger hair based on your analysis and lifestyle.
-          </p>
-        </div>
-
-        <button
-          onClick={() => alert('Downloading your personalized hair plan PDF...')}
-          className="px-4 py-2.5 rounded-xl bg-white/90 hover:bg-white border border-[#CBD5CC] text-[#082014] font-bold text-xs sm:text-sm transition shadow-2xs flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto"
-        >
-          <FileText className="w-4 h-4 text-[#0B3C26]" />
-          <span>View Plan PDF</span>
-        </button>
-      </div>
-
-      {/* 2. Category Segmented Tabs */}
-      <div className="grid grid-cols-3 gap-3 bg-white/60 p-1.5 rounded-2xl border border-white/80 max-w-xl shadow-2xs">
-        <button
-          onClick={() => setActiveCategory('Nutrition')}
-          className={`py-3 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${activeCategory === 'Nutrition'
-              ? 'bg-[#0B3C26] text-white shadow-sm'
-              : 'text-[#4E6256] hover:bg-white/80'
-            }`}
-        >
-          <Utensils className="w-4 h-4" />
-          <span>Nutrition</span>
-        </button>
-
-        <button
-          onClick={() => setActiveCategory('Hair Care')}
-          className={`py-3 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${activeCategory === 'Hair Care'
-              ? 'bg-[#0B3C26] text-white shadow-sm'
-              : 'text-[#4E6256] hover:bg-white/80'
-            }`}
-        >
-          <Droplets className="w-4 h-4" />
-          <span>Hair Care</span>
-        </button>
-
-        <button
-          onClick={() => setActiveCategory('Lifestyle')}
-          className={`py-3 px-4 rounded-xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center gap-2 cursor-pointer ${activeCategory === 'Lifestyle'
-              ? 'bg-[#0B3C26] text-white shadow-sm'
-              : 'text-[#4E6256] hover:bg-white/80'
-            }`}
-        >
-          <Leaf className="w-4 h-4" />
-          <span>Lifestyle</span>
-        </button>
-      </div>
-
-      {/* 3. Hero Banner Card */}
-      <div className="bg-[#E5ECE3]/90 backdrop-blur-xs border border-white/80 rounded-3xl p-6 sm:p-8 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6 overflow-hidden relative w-full">
-        <div className="space-y-2 max-w-lg z-10">
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-[#082014] tracking-tight leading-tight font-heading">
-            Nutrition for<br />Stronger, Healthier Hair
-          </h2>
-          <p className="text-xs sm:text-sm text-[#4E6256] font-medium leading-relaxed">
-            Fuel your hair from within. These nutrient-rich foods and meal suggestions are personalized based on your analysis and goals.
-          </p>
-        </div>
-
-        <div className="relative w-full lg:w-[360px] aspect-[16/9] rounded-2xl overflow-hidden shadow-md flex-shrink-0 border border-white/60">
-          <img
-            src="/images/nutrition_hero.jpg"
-            alt="Nutrition Hero Dish"
-            className="w-full h-full object-cover object-center"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent pointer-events-none" />
-        </div>
-      </div>
-
-      {/* 4. Main Grid Section (Left 8 Cols, Right 4 Cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start w-full">
-
-        {/* Left Column (Span 8 Cols) */}
-        <div className="lg:col-span-8 space-y-5 w-full">
-
-          {/* Section 1: Top Nutrients for You */}
-          <div className="bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 w-full">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-extrabold text-[#082014] font-heading">Top Nutrients for You</h3>
-                <p className="text-xs text-[#5C7063] font-medium mt-0.5">These nutrients can help support your hair goals.</p>
-              </div>
-              <button
-                type="button"
-                className="text-xs font-bold text-[#0B3C26] hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                View Details <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            {/* 5 Nutrient Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1 w-full">
-              {nutrients.map((n, idx) => {
-                const IconComp = n.icon;
-                return (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-2xl bg-[#F7FAF7] border border-[#E2ECE2] flex flex-col justify-between space-y-2 hover:border-[#0B3C26] transition-all shadow-2xs"
-                  >
-                    <div className={`w-8 h-8 rounded-xl ${n.iconBg} flex items-center justify-center flex-shrink-0 shadow-2xs`}>
-                      <IconComp className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-extrabold text-[#082014]">{n.name}</h4>
-                      <p className="text-[10px] text-[#5C7063] font-medium leading-tight mt-0.5">{n.benefit}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-3 py-1 rounded-full bg-[#E6F4EA] text-[#16A34A] text-xs font-extrabold flex items-center gap-1.5 border border-[#C5E8CE]">
+              <Sparkles className="w-3.5 h-3.5" /> AI Personalized Plan
+            </span>
           </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-[#082014] tracking-tight font-heading">
+            My AI Hair Care Plan
+          </h1>
+          <p className="text-xs sm:text-sm text-[#4E6256] font-medium mt-1 max-w-2xl leading-relaxed">
+            {plan.summary}
+          </p>
+        </div>
 
-          {/* Section 2: Recommended Foods */}
-          <div className="bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 w-full">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-extrabold text-[#082014] font-heading">Recommended Foods</h3>
-                <p className="text-xs text-[#5C7063] font-medium mt-0.5">Include these in your diet for better hair health.</p>
+        <button
+          onClick={handleRegenerate}
+          disabled={regenerating}
+          className="px-4 py-2.5 rounded-xl bg-white hover:bg-gray-50 border border-[#CCDCCD] text-[#082014] font-extrabold text-xs sm:text-sm transition shadow-2xs flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 text-[#0B3C26] ${regenerating ? 'animate-spin' : ''}`} />
+          <span>{regenerating ? 'Generating...' : 'Regenerate AI Plan'}</span>
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="py-16 text-center space-y-3">
+          <div className="w-8 h-8 border-3 border-[#0B3C26]/30 border-t-[#0B3C26] rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-semibold text-[#526659]">Loading your AI wellness plan...</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* 2. AI Hair Care Routine Section */}
+          <div className="bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#E6F4EA] text-[#0B3C26] flex items-center justify-center flex-shrink-0 shadow-2xs">
+                <Scissors className="w-5 h-5" />
               </div>
-              <button
-                type="button"
-                className="text-xs font-bold text-[#0B3C26] hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                See All Foods <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+              <div>
+                <h3 className="text-base font-extrabold text-[#082014] font-heading">1. Tailored Hair Care Routine</h3>
+                <p className="text-xs text-[#5C7063] font-medium">Custom care steps generated based on your scalp type</p>
+              </div>
             </div>
 
-            {/* 6 Food Cards Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 pt-1 w-full">
-              {foods.map((food, idx) => (
-                <div
-                  key={idx}
-                  className="p-2.5 rounded-2xl bg-[#F7FAF7] border border-[#E2ECE2] flex flex-col items-center text-center space-y-2 hover:border-[#0B3C26] transition-all shadow-2xs group cursor-pointer"
-                >
-                  <div className="w-full aspect-square rounded-xl overflow-hidden bg-[#E2ECE2] border border-[#CCDCCD]">
-                    <img
-                      src={food.image}
-                      alt={food.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-extrabold text-[#082014] group-hover:text-[#0B3C26]">{food.name}</h5>
-                    <p className="text-[10px] text-[#5C7063] font-medium leading-tight mt-0.5">{food.benefit}</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+              {plan.routineSuggestions.map((item, idx) => (
+                <div key={idx} className="p-4 rounded-xl bg-[#F8FAF8] border border-[#E2ECE2] space-y-2 flex flex-col justify-between">
+                  <div className="space-y-1">
+                    <span className="inline-block px-2.5 py-0.5 rounded-md bg-[#0B3C26]/10 text-[#0B3C26] text-[10px] font-extrabold uppercase font-mono">
+                      {item.frequency}
+                    </span>
+                    <h4 className="text-sm font-extrabold text-[#082014]">{item.title}</h4>
+                    <p className="text-xs text-[#4E6256] font-medium leading-relaxed">{item.instructions}</p>
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Section 3: Sample Meal Plan */}
-          <div className="bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 w-full">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-extrabold text-[#082014] font-heading">Sample Meal Plan</h3>
-                <p className="text-xs text-[#5C7063] font-medium mt-0.5">A simple 1-day meal plan to get you started.</p>
+          {/* 3. Nutrition & Key Nutrients Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+            {/* Column 1: Key Nutrients (Span 5) */}
+            <div className="lg:col-span-5 bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#E6F4EA] text-[#0B3C26] flex items-center justify-center flex-shrink-0 shadow-2xs">
+                  <Heart className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#082014] font-heading">2. Target Nutrients</h3>
+                  <p className="text-xs text-[#5C7063] font-medium">Essential nutrients for follicle repair</p>
+                </div>
               </div>
 
-              {/* Day Selector Pills */}
-              <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
-                {['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'].map((day) => (
-                  <button
-                    key={day}
-                    onClick={() => setSelectedDay(day)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${selectedDay === day
-                        ? 'bg-[#0B3C26] text-white shadow-xs font-extrabold'
-                        : 'bg-[#EFF5EE] text-[#4E6256] hover:bg-[#E2ECE2]'
-                      }`}
-                  >
-                    {day}
-                  </button>
+              <div className="space-y-3 pt-1">
+                {plan.nutrients.map((n, idx) => (
+                  <div key={idx} className="p-3.5 rounded-xl bg-[#F8FAF8] border border-[#E2ECE2] flex items-start gap-3">
+                    <CheckCircle2 className="w-4 h-4 text-[#16A34A] flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h5 className="text-xs font-extrabold text-[#082014]">{n.name}</h5>
+                      <p className="text-[11px] text-[#55695C] font-medium leading-snug">{n.benefit}</p>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
 
-            {/* 4 Meal Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5 pt-1 w-full">
-              {mealPlan.map((meal, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-2xl bg-[#F7FAF7] border border-[#E2ECE2] flex flex-col justify-between space-y-2.5 hover:border-[#0B3C26] transition-all shadow-2xs group"
-                >
-                  <div className="space-y-2">
+            {/* Column 2: Recommended Foods (Span 7) */}
+            <div className="lg:col-span-7 bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#E6F4EA] text-[#0B3C26] flex items-center justify-center flex-shrink-0 shadow-2xs">
+                  <Utensils className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#082014] font-heading">3. Recommended Superfoods</h3>
+                  <p className="text-xs text-[#5C7063] font-medium">Dietary sources rich in your required hair vitamins</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {plan.recommendedFoods.map((food, idx) => (
+                  <div key={idx} className="p-3.5 rounded-xl bg-[#F8FAF8] border border-[#E2ECE2] space-y-1">
                     <div className="flex items-center justify-between">
-                      <h5 className="text-xs font-extrabold text-[#082014]">{meal.type}</h5>
-                      <span className="text-[10px] font-bold text-[#5C7063]">{meal.time}</span>
+                      <h5 className="text-xs font-extrabold text-[#082014]">{food.name}</h5>
+                      {food.category && (
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#E6F4EA] text-[#16A34A]">
+                          {food.category}
+                        </span>
+                      )}
                     </div>
-
-                    <div className="w-full aspect-video rounded-xl overflow-hidden bg-[#E2ECE2] border border-[#CCDCCD]">
-                      <img
-                        src={meal.image}
-                        alt={meal.type}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    </div>
-
-                    <p className="text-[11px] text-[#4E6256] font-medium leading-snug">
-                      {meal.description}
-                    </p>
+                    <p className="text-[11px] text-[#55695C] font-medium leading-snug">{food.benefit}</p>
                   </div>
-
-                  <span className="inline-block px-2.5 py-0.5 rounded-md bg-[#EBF3EA] text-[#0B3C26] font-extrabold text-[10px] self-start border border-[#D5E2D4]">
-                    {meal.calories}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column (Span 4 Cols) */}
-        <div className="lg:col-span-4 space-y-5 w-full">
-
-          {/* Card 1: Your Plan Overview */}
-          <div className="bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 w-full">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-extrabold text-[#082014] font-heading">Your Plan Overview</h3>
-              <span className="px-3 py-1 rounded-full bg-[#E6F4EA] text-[#16A34A] text-xs font-extrabold border border-[#C5E8CE]">
-                Active Plan
-              </span>
-            </div>
-
-            <div className="space-y-3 pt-1 text-xs text-[#2A3E31]">
-              <div className="flex items-center justify-between pb-2 border-b border-[#EEF4EE]">
-                <span className="flex items-center gap-2 font-bold text-[#5C7063]">
-                  <FileCheck className="w-4 h-4 text-[#0B3C26]" /> Plan Type
-                </span>
-                <span className="font-extrabold text-[#082014]">Personalized Hair Wellness</span>
-              </div>
-
-              <div className="flex items-center justify-between pb-2 border-b border-[#EEF4EE]">
-                <span className="flex items-center gap-2 font-bold text-[#5C7063]">
-                  <Calendar className="w-4 h-4 text-[#0B3C26]" /> Start Date
-                </span>
-                <span className="font-extrabold text-[#082014]">12 Sep 2025</span>
-              </div>
-
-              <div className="flex items-center justify-between pb-2 border-b border-[#EEF4EE]">
-                <span className="flex items-center gap-2 font-bold text-[#5C7063]">
-                  <Clock className="w-4 h-4 text-[#0B3C26]" /> Duration
-                </span>
-                <span className="font-extrabold text-[#082014]">12 Weeks</span>
-              </div>
-
-              <div className="flex items-start justify-between pb-2 border-b border-[#EEF4EE] gap-2">
-                <span className="flex items-center gap-2 font-bold text-[#5C7063]">
-                  <Target className="w-4 h-4 text-[#0B3C26] flex-shrink-0" /> Goal
-                </span>
-                <span className="font-extrabold text-[#082014] text-right">Reduce hair fall & improve density</span>
-              </div>
-
-              <div className="flex items-start justify-between gap-2 pt-0.5">
-                <span className="flex items-center gap-2 font-bold text-[#5C7063]">
-                  <FileText className="w-4 h-4 text-[#0B3C26] flex-shrink-0" /> Based On
-                </span>
-                <span className="font-extrabold text-[#082014] text-right">Your analysis, lifestyle and goals</span>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* Card 2: Today's Nutrition */}
-          <div className="bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 w-full">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-extrabold text-[#082014] font-heading">Today's Nutrition</h3>
-              <button
-                type="button"
-                onClick={() => router.push('/routine')}
-                className="text-xs font-bold text-[#0B3C26] hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                View Full Plan <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="space-y-2.5 w-full">
-              {/* Task 1 */}
-              <div
-                onClick={() => toggleTask('water')}
-                className="flex items-center justify-between p-3 rounded-xl bg-[#F7FAF7] border border-[#E2ECE2] hover:border-[#0B3C26] transition cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${tasksDone.water ? 'bg-[#10B981] text-white' : 'border-2 border-[#A0B5A3]'
-                    }`}>
-                    {tasksDone.water && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                  </div>
-                  <Droplets className="w-4 h-4 text-[#0B3C26] flex-shrink-0" />
-                  <span className="text-xs font-extrabold text-[#082014]">Drink 2L water</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#718578]" />
+          {/* 4. Lifestyle & Habit Adjustments */}
+          <div className="bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#E6F4EA] text-[#0B3C26] flex items-center justify-center flex-shrink-0 shadow-2xs">
+                <Leaf className="w-5 h-5" />
               </div>
-
-              {/* Task 2 */}
-              <div
-                onClick={() => toggleTask('breakfast')}
-                className="flex items-center justify-between p-3 rounded-xl bg-[#F7FAF7] border border-[#E2ECE2] hover:border-[#0B3C26] transition cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${tasksDone.breakfast ? 'bg-[#10B981] text-white' : 'border-2 border-[#A0B5A3]'
-                    }`}>
-                    {tasksDone.breakfast && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                  </div>
-                  <Utensils className="w-4 h-4 text-[#0B3C26] flex-shrink-0" />
-                  <span className="text-xs font-extrabold text-[#082014]">Have protein-rich breakfast</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#718578]" />
-              </div>
-
-              {/* Task 3 */}
-              <div
-                onClick={() => toggleTask('greens')}
-                className="flex items-center justify-between p-3 rounded-xl bg-[#F7FAF7] border border-[#E2ECE2] hover:border-[#0B3C26] transition cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${tasksDone.greens ? 'bg-[#10B981] text-white' : 'border-2 border-[#A0B5A3]'
-                    }`}>
-                    {tasksDone.greens && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                  </div>
-                  <Leaf className="w-4 h-4 text-[#0B3C26] flex-shrink-0" />
-                  <span className="text-xs font-extrabold text-[#082014]">Include leafy greens</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#718578]" />
+              <div>
+                <h3 className="text-base font-extrabold text-[#082014] font-heading">4. Lifestyle & Scalp Care Habits</h3>
+                <p className="text-xs text-[#5C7063] font-medium">Daily habits to promote long-term hair retention</p>
               </div>
             </div>
-          </div>
 
-          {/* Card 3: Weekly Nutrition Progress */}
-          <div className="bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 w-full">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-extrabold text-[#082014] font-heading">Weekly Nutrition Progress</h3>
-              <span className="text-xs font-extrabold text-[#0B3C26]">4/7 days ›</span>
-            </div>
-
-            <div className="flex items-center justify-between pt-1 w-full">
-              {[
-                { day: 'Mon', done: true },
-                { day: 'Tue', done: true },
-                { day: 'Wed', done: true },
-                { day: 'Thu', done: true },
-                { day: 'Fri', done: false },
-                { day: 'Sat', done: false },
-                { day: 'Sun', done: false },
-              ].map((item, idx) => (
-                <div key={idx} className="flex flex-col items-center gap-2">
-                  <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold transition ${item.done
-                        ? 'bg-[#10B981] text-white shadow-2xs'
-                        : 'border-2 border-[#CCDCD0] bg-white/70 text-[#A0B5A3]'
-                      }`}
-                  >
-                    {item.done ? <Check className="w-4 h-4 stroke-[3]" /> : null}
-                  </div>
-                  <span className="text-[11px] font-bold text-[#5C7063]">{item.day}</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+              {plan.lifestyleHabits.map((habit, idx) => (
+                <div key={idx} className="p-4 rounded-xl bg-[#F8FAF8] border border-[#E2ECE2] space-y-1.5">
+                  <h4 className="text-xs font-extrabold text-[#082014]">{habit.title}</h4>
+                  <p className="text-xs text-[#4E6256] font-medium leading-relaxed">{habit.recommendation}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Card 4: Additional Resources */}
-          <div className="bg-white/90 backdrop-blur-xs border border-white/80 rounded-2xl p-5 sm:p-6 shadow-sm space-y-3.5 w-full">
-            <h3 className="text-base font-extrabold text-[#082014] font-heading">Additional Resources</h3>
-
-            <div className="space-y-2.5 w-full">
-              <button
-                type="button"
-                onClick={() => alert('Downloading Meal Plan PDF...')}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white border border-[#D8E4D8] hover:border-[#0B3C26] text-xs font-bold text-[#142A1E] transition group cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-7.5 h-7.5 rounded-lg bg-[#E6F4EA] text-[#0B3C26] flex items-center justify-center">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <span>Download Meal Plan PDF</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#718578] group-hover:translate-x-0.5 transition-transform" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => alert('Opening your personalized grocery list...')}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white border border-[#D8E4D8] hover:border-[#0B3C26] text-xs font-bold text-[#142A1E] transition group cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-7.5 h-7.5 rounded-lg bg-[#E6F4EA] text-[#0B3C26] flex items-center justify-center">
-                    <ShoppingCart className="w-4 h-4" />
-                  </div>
-                  <span>Grocery List</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#718578] group-hover:translate-x-0.5 transition-transform" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => alert('Opening nutrition tips...')}
-                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white border border-[#D8E4D8] hover:border-[#0B3C26] text-xs font-bold text-[#142A1E] transition group cursor-pointer shadow-2xs"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-7.5 h-7.5 rounded-lg bg-[#E6F4EA] text-[#0B3C26] flex items-center justify-center">
-                    <Lightbulb className="w-4 h-4" />
-                  </div>
-                  <span>Nutrition Tips</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-[#718578] group-hover:translate-x-0.5 transition-transform" />
-              </button>
+          {/* 5. Accept & Action Footer */}
+          <div className="p-6 rounded-2xl bg-[#0B3C26] text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md">
+            <div>
+              <h3 className="text-base font-extrabold font-heading">Ready to start your routine?</h3>
+              <p className="text-xs text-emerald-100 font-medium mt-0.5">
+                Track your daily routine progress and schedule a follow-up assessment in 30 days.
+              </p>
             </div>
+
+            <button
+              onClick={() => {
+                setAccepted(true);
+                router.push('/dashboard');
+              }}
+              className="px-6 py-3 rounded-full bg-white text-[#0B3C26] font-extrabold text-xs sm:text-sm hover:bg-emerald-50 transition shadow-sm flex items-center justify-center gap-2 cursor-pointer self-start sm:self-auto"
+            >
+              {accepted ? (
+                <>
+                  <Check className="w-4 h-4 stroke-[3]" /> Plan Active
+                </>
+              ) : (
+                <>
+                  <span>Activate My AI Plan</span> <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
           </div>
 
+          {/* Disclaimer */}
+          <div className="p-3.5 rounded-xl bg-[#EFF5EE] border border-[#E0EAE0] flex items-center justify-between text-xs text-[#526659]">
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-[#0B3C26] flex-shrink-0" />
+              <p className="text-[11px] font-medium">
+                {plan.disclaimer || 'This plan provides general wellness and nutrition guidance derived from your trichology analysis.'}
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

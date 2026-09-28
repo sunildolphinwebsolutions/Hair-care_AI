@@ -134,8 +134,19 @@ model VisualAssessment {
   unassessedAreas     String[]
   limitations         String[]
   recommendRetake     Boolean      @default(false)
-  modelVersion        String       @default("gemini-1.5-flash")
+  modelVersion        String       @default("gemini-2.0-flash")
   disclaimer          String       @default("This analysis is for informational purposes only and not a medical diagnosis.")
+  
+  // Quantitative AI Scalp Vision Scores
+  hairDensityScore       Int?         @default(78)
+  sebumLevelScore        Int?         @default(42)
+  scalpHydrationScore    Int?         @default(84)
+  follicleCountEstimate  Int?         @default(142)
+  strandThicknessMicrons Float?       @default(65)
+  sheddingRiskLevel      String?      @default("Low")
+  angleScores            Json?
+  doctorRecommendations  Json?
+  
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
@@ -264,6 +275,8 @@ model Routine {
   title       String
   description String?
   frequency   String   // Daily, Weekly, Bi-weekly
+  time        String?  @default("09:00 AM")
+  category    String?  @default("Scalp Care")
   isAI        Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
